@@ -76,7 +76,7 @@ jobs:
           max-score: 2
 
       ####################################################
-      # Hidden Tests
+      # Hidden Tests (JUnit — students see assertion messages on failure)
       ####################################################
 
       - name: Hidden Test - Command Sequence
@@ -85,20 +85,38 @@ jobs:
         with:
           test-name: "Hidden: Command Sequence"
           setup-command: |
-            cat << 'EOF' > HiddenCommandSequence.java
-            import workflow.*;
-            public class HiddenCommandSequence {
-              public static void main(String[] args) {
-                WorkflowBoard board = new WorkflowBoard();
-                new CreateCommand(board,"Bug").performCommand();
-                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
-                new MoveCommand(board,1,Status.DONE).performCommand();
-                if(board.getDoneTickets().size() != 1) { System.exit(1); }
-              }
+            mkdir -p src/test/java/workflow
+            cat << 'TESTEOF' > src/test/java/workflow/HiddenCommandSequenceTest.java
+            package workflow;
+
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.*;
+
+            public class HiddenCommandSequenceTest {
+
+                @Test
+                void createAndMoveThroughAllColumns() {
+                    WorkflowBoard board = new WorkflowBoard();
+
+                    new CreateCommand(board, "Bug Fix").performCommand();
+                    assertEquals(1, board.getToDoTickets().size(),
+                            "After create, expected 1 ticket in To Do");
+
+                    new MoveCommand(board, 1, Status.IN_PROGRESS).performCommand();
+                    assertEquals(0, board.getToDoTickets().size(),
+                            "After move to IN_PROGRESS, To Do should be empty");
+                    assertEquals(1, board.getInProgressTickets().size(),
+                            "After move to IN_PROGRESS, expected 1 ticket in In Progress");
+
+                    new MoveCommand(board, 1, Status.DONE).performCommand();
+                    assertEquals(0, board.getInProgressTickets().size(),
+                            "After move to DONE, In Progress should be empty");
+                    assertEquals(1, board.getDoneTickets().size(),
+                            "After move to DONE, expected 1 ticket in Done");
+                }
             }
-            EOF
-            javac -cp target/classes HiddenCommandSequence.java
-          command: java -cp target/classes:. HiddenCommandSequence
+            TESTEOF
+          command: "mvn -B -Dtest=workflow.HiddenCommandSequenceTest test"
           timeout: 2
           max-score: 3
 
@@ -108,21 +126,30 @@ jobs:
         with:
           test-name: "Hidden: Audit Log Integrity"
           setup-command: |
-            cat << 'EOF' > HiddenAuditTest.java
-            import workflow.*;
-  
-            public class HiddenAuditTest {
-              public static void main(String[] args) {
-                WorkflowBoard board = new WorkflowBoard();
-                new CreateCommand(board,"A").performCommand();
-                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
-                new MoveCommand(board,1,Status.DONE).performCommand();
-                if(board.getAuditLog().size() < 3) { System.exit(1); }
-              }
+            mkdir -p src/test/java/workflow
+            cat << 'TESTEOF' > src/test/java/workflow/HiddenAuditLogTest.java
+            package workflow;
+
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.*;
+
+            public class HiddenAuditLogTest {
+
+                @Test
+                void everyCommandIsRecordedInAuditLog() {
+                    WorkflowBoard board = new WorkflowBoard();
+
+                    new CreateCommand(board, "A").performCommand();
+                    new MoveCommand(board, 1, Status.IN_PROGRESS).performCommand();
+                    new MoveCommand(board, 1, Status.DONE).performCommand();
+
+                    assertTrue(board.getAuditLog().size() >= 3,
+                            "Expected at least 3 audit log entries after 3 commands, but found "
+                            + board.getAuditLog().size());
+                }
             }
-            EOF  
-            javac -cp target/classes HiddenAuditTest.java
-          command: java -cp target/classes:. HiddenAuditTest
+            TESTEOF
+          command: "mvn -B -Dtest=workflow.HiddenAuditLogTest test"
           timeout: 2
           max-score: 3
 
@@ -132,44 +159,141 @@ jobs:
         with:
           test-name: "Hidden: Alter Command Behavior"
           setup-command: |
-            cat << 'EOF' > HiddenAlterTest.java
-            import workflow.*;
+            mkdir -p src/test/java/workflow
+            cat << 'TESTEOF' > src/test/java/workflow/HiddenAlterTest.java
+            package workflow;
+
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.*;
+
             public class HiddenAlterTest {
-              public static void main(String[] args) {
-                WorkflowBoard board = new WorkflowBoard();
-                new CreateCommand(board,"Old Title").performCommand();
-                new AlterCommand(board, 1, "New Title").performCommand(); 
-                if(!board.getTicketById(1).getTitle().equals("New Title")) { System.exit(1); }
-              }
+
+                @Test
+                void alterCommandChangesTicketTitle() {
+                    WorkflowBoard board = new WorkflowBoard();
+
+                    new CreateCommand(board, "Old Title").performCommand();
+                    new AlterCommand(board, 1, "title", "New Title").performCommand();
+
+                    Ticket ticket = board.getTicketById(1);
+                    assertNotNull(ticket, "getTicketById(1) should not return null");
+                    assertEquals("New Title", ticket.getTitle(),
+                            "After alter, ticket title should be 'New Title'");
+                }
             }
-            EOF
-            javac -cp target/classes HiddenAlterTest.java
-          command: java -cp target/classes:. HiddenAlterTest
+            TESTEOF
+          command: "mvn -B -Dtest=workflow.HiddenAlterTest test"
           timeout: 2
           max-score: 3
 
-      - name: Hidden Test - Multiple Commands
-        id: hidden-multiple
+      - name: Hidden Test - Integration
+        id: hidden-integration
         uses: education/autograding-command-grader@v1
         with:
-          test-name: "Hidden: Multiple Commands"
+          test-name: "Hidden: Integration"
           setup-command: |
-            cat << 'EOF' > HiddenMultipleCommandsTest.java
-            import workflow.*;
-            public class HiddenMultipleCommandsTest {
-              public static void main(String[] args) {
-                WorkflowBoard board = new WorkflowBoard();
-                new CreateCommand(board,"Task").performCommand();
-                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
-                new MoveCommand(board,1,Status.DONE).performCommand();
-                if(board.getDoneTickets().size() != 1 || board.getAuditLog().size() < 3) { System.exit(1); }
-              }
+            mkdir -p src/test/java/workflow
+            cat << 'TESTEOF' > src/test/java/workflow/HiddenIntegrationTest.java
+            package workflow;
+
+            import org.junit.jupiter.api.Test;
+            import static org.junit.jupiter.api.Assertions.*;
+
+            public class HiddenIntegrationTest {
+
+                @Test
+                void fullWorkflow_createMoveAlterAndVerify() {
+                    WorkflowBoard board = new WorkflowBoard();
+
+                    // Create two tickets
+                    new CreateCommand(board, "Feature A").performCommand();
+                    new CreateCommand(board, "Feature B").performCommand();
+                    assertEquals(2, board.getToDoTickets().size(),
+                            "Expected 2 tickets in To Do after two creates");
+
+                    // Move first ticket through the board
+                    new MoveCommand(board, 1, Status.IN_PROGRESS).performCommand();
+                    new MoveCommand(board, 1, Status.DONE).performCommand();
+
+                    // Alter second ticket
+                    new AlterCommand(board, 2, "title", "Feature B - Updated").performCommand();
+
+                    // Verify board state
+                    assertEquals(1, board.getToDoTickets().size(),
+                            "Expected 1 ticket remaining in To Do");
+                    assertEquals(0, board.getInProgressTickets().size(),
+                            "Expected 0 tickets in In Progress");
+                    assertEquals(1, board.getDoneTickets().size(),
+                            "Expected 1 ticket in Done");
+
+                    // Verify alter took effect
+                    assertEquals("Feature B - Updated", board.getTicketById(2).getTitle(),
+                            "Ticket 2 title should be updated");
+
+                    // Verify audit log captured everything
+                    assertTrue(board.getAuditLog().size() >= 5,
+                            "Expected at least 5 audit entries (2 creates + 2 moves + 1 alter), found "
+                            + board.getAuditLog().size());
+                }
             }
-            EOF
-            javac -cp target/classes HiddenMultipleCommandsTest.java
-          command: java -cp target/classes:. HiddenMultipleCommandsTest
+            TESTEOF
+          command: "mvn -B -Dtest=workflow.HiddenIntegrationTest test"
           timeout: 2
           max-score: 3
+
+      ####################################################
+      # Reporting
+      ####################################################
+
+      - name: Grade Summary
+        if: always()
+        run: |
+          echo "## Autograding Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Test | Status | Points |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          # Public tests
+          for pair in \
+            "Structure:structure:6" \
+            "Create Command:create-command:1" \
+            "Move Command:move-command:2" \
+            "Alter Command:alter-command:1" \
+            "Audit Log:audit-log:1" \
+            "Robustness:robustness:2" \
+            "Hidden - Sequence:hidden-sequence:3" \
+            "Hidden - Audit Log:hidden-audit:3" \
+            "Hidden - Alter:hidden-alter:3" \
+            "Hidden - Integration:hidden-integration:3"
+          do
+            IFS=':' read -r name id max <<< "$pair"
+
+            # Check individual step outcome via env vars set below
+            step_var="STEP_${id//-/_}"
+            step_result="${!step_var}"
+
+            if [ "$step_result" = "pass" ]; then
+              echo "| $name | :white_check_mark: Pass | $max / $max |" >> $GITHUB_STEP_SUMMARY
+              earned=$max
+            else
+              echo "| $name | :x: Fail | 0 / $max |" >> $GITHUB_STEP_SUMMARY
+              earned=0
+            fi
+          done
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Check the individual test steps above for detailed failure messages." >> $GITHUB_STEP_SUMMARY
+        env:
+          STEP_structure: ${{ steps.structure.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_create_command: ${{ steps.create-command.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_move_command: ${{ steps.move-command.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_alter_command: ${{ steps.alter-command.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_audit_log: ${{ steps.audit-log.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_robustness: ${{ steps.robustness.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_hidden_sequence: ${{ steps.hidden-sequence.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_hidden_audit: ${{ steps.hidden-audit.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_hidden_alter: ${{ steps.hidden-alter.outcome == 'success' && 'pass' || 'fail' }}
+          STEP_hidden_integration: ${{ steps.hidden-integration.outcome == 'success' && 'pass' || 'fail' }}
 
       - name: Autograding Reporter
         uses: education/autograding-grading-reporter@v1
@@ -184,6 +308,6 @@ jobs:
           HIDDEN_SEQ_RESULTS: "${{steps.hidden-sequence.outputs.result}}"
           HIDDEN_AUDIT_RESULTS: "${{steps.hidden-audit.outputs.result}}"
           HIDDEN_ALTER_RESULTS: "${{steps.hidden-alter.outputs.result}}"
-          HIDDEN_MULT_RESULTS: "${{steps.hidden-multiple.outputs.result}}"
+          HIDDEN_INT_RESULTS: "${{steps.hidden-integration.outputs.result}}"
         with:
-          runners: "structure,create-command,move-command,alter-command,audit-log,robustness,hidden-sequence,hidden-audit,hidden-alter,hidden-multiple"
+          runners: "structure,create-command,move-command,alter-command,audit-log,robustness,hidden-sequence,hidden-audit,hidden-alter,hidden-integration"
