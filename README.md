@@ -97,10 +97,20 @@ The Java classes in your solution **must match the following UML class diagram**
 
 The UML diagram **may not contain all fields and methods** required for the system, e.g., constructors, getters and setters.
 
-When a command is **created**, it is **not executed immediately**.  
+When a command is **created**, it is **not executed immediately**.
 To execute a command, the `performCommand()` method must be called.
 
 The design shown in the UML diagram resembles the **Command Design Pattern** and you can find more information on this pattern [here](https://en.wikipedia.org/wiki/Command_pattern).
+
+### Constructor hints
+
+| Command | Constructor signature |
+|---------|---------------------|
+| `CreateCommand` | `(WorkflowBoard board, String title)` |
+| `MoveCommand` | `(WorkflowBoard board, int ticketId, Status newStatus)` — must also accept a `String` for the status (e.g. `"In Progress"`) |
+| `AlterCommand` | `(WorkflowBoard board, int ticketId, String field, String value)` |
+
+> **Tip:** `MoveCommand` is tested with both `Status.IN_PROGRESS` and the string `"In Progress"`. Make sure your constructor can handle both.
 
 ---
 
@@ -185,11 +195,35 @@ Example:
 
 # Note About Repository
 
-* The repository initially contains automated tests only.
+* The repository contains automated tests and a starter `Main.java` console menu.
 
 * The project will not compile until you implement the classes shown in the UML diagram.
 
-* Required package name: workflow (see the empty `src/main/java/workflow` package)
+* Required package name: workflow (see `src/main/java/workflow`)
+
+* A `Main.java` file is provided with the console menu already built. Look for the `// TODO` comments — you just need to create and call your command objects.
+
+---
+
+# What Happens When You Push
+
+Every push triggers **GitHub Actions autograding**. You can see your results in the **Actions** tab of your repository.
+
+| Category | Tests | Points |
+|----------|-------|--------|
+| Structure | Classes, interfaces, and inheritance | 6 |
+| Create Command | Creating tickets | 1 |
+| Move Command | Moving tickets between columns | 2 |
+| Alter Command | Modifying ticket fields | 1 |
+| Audit Log | Logging every command | 1 |
+| Robustness | Unique IDs, no duplicates, String status | 2 |
+| Hidden tests (4) | Full workflow scenarios | 12 |
+| **Total** | | **25** |
+
+**Tips:**
+- The **public tests** are in `src/test/java/workflow/` — read them to understand exactly what is expected.
+- The **hidden tests** are not in the repository but they use the same constructors and methods as the public tests. If all public tests pass, the hidden tests should too.
+- After each push, click the **Actions** tab, then click the latest run to see a **grade summary table** and detailed test output.
 
 ---
 
