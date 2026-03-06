@@ -173,6 +173,7 @@ jobs:
 
       - name: Autograding Reporter
         uses: education/autograding-grading-reporter@v1
+        if: always()
         env:
           STRUCTURE_RESULTS: "${{steps.structure.outputs.result}}"
           CREATE_RESULTS: "${{steps.create-command.outputs.result}}"
