@@ -1,0 +1,188 @@
+name: Autograde
+
+on: [push]
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: 'maven'
+
+      - name: Build Project
+        run: mvn -B -q clean compile
+
+      - name: Structure Tests
+        id: structure
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Structure"
+          command: "mvn -B -Dtest=workflow.StructureTests test"
+          timeout: 2
+          max-score: 6
+
+      - name: Create Command Tests
+        id: create-command
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Create Command"
+          command: "mvn -B -Dtest=workflow.CreateCommandTests test"
+          timeout: 2
+          max-score: 1
+
+      - name: Move Command Tests
+        id: move-command
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Move Command"
+          command: "mvn -B -Dtest=workflow.MoveCommandTests test"
+          timeout: 2
+          max-score: 2
+
+      - name: Alter Command Tests
+        id: alter-command
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Alter Command"
+          command: "mvn -B -Dtest=workflow.AlterCommandTests test"
+          timeout: 2
+          max-score: 1
+
+      - name: Audit Log Tests
+        id: audit-log
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Audit Log"
+          command: "mvn -B -Dtest=workflow.AuditLogTests test"
+          timeout: 2
+          max-score: 1
+
+      - name: Robustness Tests
+        id: robustness
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Robustness"
+          command: "mvn -B -Dtest=workflow.RobustnessTests test"
+          timeout: 2
+          max-score: 2
+
+      ####################################################
+      # Hidden Tests
+      ####################################################
+
+      - name: Hidden Test - Command Sequence
+        id: hidden-sequence
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Command Sequence"
+          setup-command: |
+            cat << 'EOF' > HiddenCommandSequence.java
+            import workflow.*;
+            public class HiddenCommandSequence {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Bug").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getDoneTickets().size() != 1) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenCommandSequence.java
+          command: java -cp target/classes:. HiddenCommandSequence
+          timeout: 2
+          max-score: 3
+
+      - name: Hidden Test - Audit Log
+        id: hidden-audit
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Audit Log Integrity"
+          setup-command: |
+            cat << 'EOF' > HiddenAuditTest.java
+            import workflow.*;
+  
+            public class HiddenAuditTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"A").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getAuditLog().size() < 3) { System.exit(1); }
+              }
+            }
+            EOF  
+            javac -cp target/classes HiddenAuditTest.java
+          command: java -cp target/classes:. HiddenAuditTest
+          timeout: 2
+          max-score: 3
+
+      - name: Hidden Test - Alter Command
+        id: hidden-alter
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Alter Command Behavior"
+          setup-command: |
+            cat << 'EOF' > HiddenAlterTest.java
+            import workflow.*;
+            public class HiddenAlterTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Old Title").performCommand();
+                new AlterCommand(board, 1, "New Title").performCommand(); 
+                if(!board.getTicketById(1).getTitle().equals("New Title")) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenAlterTest.java
+          command: java -cp target/classes:. HiddenAlterTest
+          timeout: 2
+          max-score: 3
+
+      - name: Hidden Test - Multiple Commands
+        id: hidden-multiple
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Multiple Commands"
+          setup-command: |
+            cat << 'EOF' > HiddenMultipleCommandsTest.java
+            import workflow.*;
+            public class HiddenMultipleCommandsTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Task").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getDoneTickets().size() != 1 || board.getAuditLog().size() < 3) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenMultipleCommandsTest.java
+          command: java -cp target/classes:. HiddenMultipleCommandsTest
+          timeout: 2
+          max-score: 3
+
+      - name: Autograding Reporter
+        uses: education/autograding-grading-reporter@v1
+        env:
+          STRUCTURE_RESULTS: "${{steps.structure.outputs.result}}"
+          CREATE_RESULTS: "${{steps.create-command.outputs.result}}"
+          MOVE_RESULTS: "${{steps.move-command.outputs.result}}"
+          ALTER_RESULTS: "${{steps.alter-command.outputs.result}}"
+          AUDIT_RESULTS: "${{steps.audit-log.outputs.result}}"
+          ROBUST_RESULTS: "${{steps.robustness.outputs.result}}"
+          HIDDEN_SEQ_RESULTS: "${{steps.hidden-sequence.outputs.result}}"
+          HIDDEN_AUDIT_RESULTS: "${{steps.hidden-audit.outputs.result}}"
+          HIDDEN_ALTER_RESULTS: "${{steps.hidden-alter.outputs.result}}"
+          HIDDEN_MULT_RESULTS: "${{steps.hidden-multiple.outputs.result}}"
+        with:
+          runners: structure,create-command,move-command,alter-command,audit-log,robustness,hidden-sequence,hidden-audit,hidden-alter,hidden-multiple
