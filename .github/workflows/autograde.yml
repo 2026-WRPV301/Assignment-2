@@ -1,0 +1,243 @@
+name: Autograde
+
+on: [push]
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 11
+          cache: 'maven'
+
+      - name: Build Project
+        run: mvn -B -q clean compile
+
+      - name: Structure Tests
+        id: structure
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Structure"
+          command: "mvn -B -Dtest=workflow.StructureTests test"
+          timeout: 2
+          max-score: 8
+
+      - name: Workflow Tests
+        id: workflow
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Workflow"
+          command: "mvn -B -Dtest=workflow.WorkflowTests test"
+          timeout: 2
+          max-score: 2
+
+      ####################################################
+      # Hidden Tests
+      ####################################################
+
+      - name: Hidden Test - Move Command
+        id: hidden-move
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Move Command"
+          setup-command: |
+            cat << 'EOF' > HiddenMoveTest.java
+            import workflow.*;
+            public class HiddenMoveTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Test").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                if(board.getToDoTickets().size() != 0) { System.exit(1); }
+                if(board.getInProgressTickets().size() != 1) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenMoveTest.java
+          command: java -cp target/classes:. HiddenMoveTest
+          timeout: 2
+          max-score: 2
+
+      - name: Hidden Test - Alter Command
+        id: hidden-alter-field
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Alter Command"
+          setup-command: |
+            cat << 'EOF' > HiddenAlterFieldTest.java
+            import workflow.*;
+            public class HiddenAlterFieldTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Test").performCommand();
+                new AlterCommand(board,1,"priority","High").performCommand();
+                if(!"High".equals(board.getTicketById(1).getPriority())) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenAlterFieldTest.java
+          command: java -cp target/classes:. HiddenAlterFieldTest
+          timeout: 2
+          max-score: 2
+
+      - name: Hidden Test - Unique Ticket IDs
+        id: hidden-unique-ids
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Unique Ticket IDs"
+          setup-command: |
+            cat << 'EOF' > HiddenUniqueIdTest.java
+            import workflow.*;
+            public class HiddenUniqueIdTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"A").performCommand();
+                new CreateCommand(board,"B").performCommand();
+                Ticket t1 = board.getTicketById(1);
+                Ticket t2 = board.getTicketById(2);
+                if(t1 == null || t2 == null || t1 == t2) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenUniqueIdTest.java
+          command: java -cp target/classes:. HiddenUniqueIdTest
+          timeout: 2
+          max-score: 1
+
+      - name: Hidden Test - No Duplicate on Move
+        id: hidden-no-dup
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: No Duplicate on Move"
+          setup-command: |
+            cat << 'EOF' > HiddenNoDupTest.java
+            import workflow.*;
+            public class HiddenNoDupTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Test").performCommand();
+                new MoveCommand(board,1,"In Progress").performCommand();
+                if(board.getInProgressTickets().size() != 1) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenNoDupTest.java
+          command: java -cp target/classes:. HiddenNoDupTest
+          timeout: 2
+          max-score: 1
+
+      - name: Hidden Test - Command Sequence
+        id: hidden-sequence
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Command Sequence"
+          setup-command: |
+            cat << 'EOF' > HiddenCommandSequence.java
+            import workflow.*;
+            public class HiddenCommandSequence {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Bug").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getDoneTickets().size() != 1) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenCommandSequence.java
+          command: java -cp target/classes:. HiddenCommandSequence
+          timeout: 2
+          max-score: 3
+
+      - name: Hidden Test - Audit Log Integrity
+        id: hidden-audit
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Audit Log Integrity"
+          setup-command: |
+            cat << 'EOF' > HiddenAuditTest.java
+            import workflow.*;
+            public class HiddenAuditTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"A").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getAuditLog().size() < 3) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenAuditTest.java
+          command: java -cp target/classes:. HiddenAuditTest
+          timeout: 2
+          max-score: 2
+
+      - name: Hidden Test - Alter Title
+        id: hidden-alter
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Alter Title"
+          setup-command: |
+            cat << 'EOF' > HiddenAlterTest.java
+            import workflow.*;
+            public class HiddenAlterTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Old Title").performCommand();
+                new AlterCommand(board, 1, "title", "New Title").performCommand();
+                if(!board.getTicketById(1).getTitle().equals("New Title")) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenAlterTest.java
+          command: java -cp target/classes:. HiddenAlterTest
+          timeout: 2
+          max-score: 2
+
+      - name: Hidden Test - Multiple Commands
+        id: hidden-multiple
+        uses: education/autograding-command-grader@v1
+        with:
+          test-name: "Hidden: Multiple Commands"
+          setup-command: |
+            cat << 'EOF' > HiddenMultipleCommandsTest.java
+            import workflow.*;
+            public class HiddenMultipleCommandsTest {
+              public static void main(String[] args) {
+                WorkflowBoard board = new WorkflowBoard();
+                new CreateCommand(board,"Task").performCommand();
+                new MoveCommand(board,1,Status.IN_PROGRESS).performCommand();
+                new MoveCommand(board,1,Status.DONE).performCommand();
+                if(board.getDoneTickets().size() != 1 || board.getAuditLog().size() < 3) { System.exit(1); }
+              }
+            }
+            EOF
+            javac -cp target/classes HiddenMultipleCommandsTest.java
+          command: java -cp target/classes:. HiddenMultipleCommandsTest
+          timeout: 2
+          max-score: 2
+
+      - name: Autograding Reporter
+        uses: education/autograding-grading-reporter@v1
+        if: always()
+        env:
+          STRUCTURE_RESULTS: "${{steps.structure.outputs.result}}"
+          WORKFLOW_RESULTS: "${{steps.workflow.outputs.result}}"
+          HIDDEN_MOVE_RESULTS: "${{steps.hidden-move.outputs.result}}"
+          HIDDEN_ALTER_FIELD_RESULTS: "${{steps.hidden-alter-field.outputs.result}}"
+          HIDDEN_UNIQUE_RESULTS: "${{steps.hidden-unique-ids.outputs.result}}"
+          HIDDEN_NODUP_RESULTS: "${{steps.hidden-no-dup.outputs.result}}"
+          HIDDEN_SEQ_RESULTS: "${{steps.hidden-sequence.outputs.result}}"
+          HIDDEN_AUDIT_RESULTS: "${{steps.hidden-audit.outputs.result}}"
+          HIDDEN_ALTER_RESULTS: "${{steps.hidden-alter.outputs.result}}"
+          HIDDEN_MULT_RESULTS: "${{steps.hidden-multiple.outputs.result}}"
+        with:
+          runners: "structure,workflow,hidden-move,hidden-alter-field,hidden-unique-ids,hidden-no-dup,hidden-sequence,hidden-audit,hidden-alter,hidden-multiple"

@@ -1,0 +1,59 @@
+classDiagram
+    direction TB
+
+    class WorkflowCommand {
+        <<interface>>
+        +performCommand() void
+    }
+
+    class AbstractWorkflowCommand {
+        <<abstract>>
+        -board : WorkflowBoard
+        +AbstractWorkflowCommand(WorkflowBoard b)
+        +performCommand() void
+    }
+
+    class WorkflowBoard {
+        -columns
+        -tickets
+        -auditLog
+        +...()
+    }
+
+    class CreateCommand {
+        +CreateCommand(WorkflowBoard b, String title, ...)
+        +performCommand() void
+    }
+
+    class MoveCommand {
+        +MoveCommand(WorkflowBoard b, int ticketId, String toColumn)
+        +performCommand() void
+    }
+
+    class AlterCommand {
+        +AlterCommand(WorkflowBoard b, int ticketId, String field, ...)
+        +performCommand() void
+    }
+
+    class Ticket {
+        -id : int
+        -title : String
+        -description : String
+        -priority : String
+        -status : Status
+    }
+
+    class Status {
+        <<enumeration>>
+        TO_DO
+        IN_PROGRESS
+        DONE
+    }
+
+    WorkflowCommand <|.. AbstractWorkflowCommand : implements
+    AbstractWorkflowCommand --> "1" WorkflowBoard : board
+    AbstractWorkflowCommand <|-- CreateCommand
+    AbstractWorkflowCommand <|-- MoveCommand
+    AbstractWorkflowCommand <|-- AlterCommand
+    WorkflowBoard --> "*" Ticket : manages
+    Ticket --> "1" Status : status
