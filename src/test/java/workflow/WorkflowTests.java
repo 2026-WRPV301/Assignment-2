@@ -16,6 +16,35 @@ public class WorkflowTests {
     }
 
     @Test
+    public void moveMovesTicketToColumn() {
+
+        WorkflowBoard board = new WorkflowBoard();
+
+        new CreateCommand(board, "Login Feature").performCommand();
+
+        int ticketId = board.getToDoTickets().get(0).getId();
+
+        new MoveCommand(board, ticketId, "In Progress").performCommand();
+
+        assertEquals(0, board.getToDoTickets().size());
+        assertEquals(1, board.getInProgressTickets().size());
+    }
+
+    @Test
+    public void alterUpdatesTicketField() {
+
+        WorkflowBoard board = new WorkflowBoard();
+
+        new CreateCommand(board, "Login Feature").performCommand();
+
+        int ticketId = board.getToDoTickets().get(0).getId();
+
+        new AlterCommand(board, ticketId, "priority", "High").performCommand();
+
+        assertEquals("High", board.getToDoTickets().get(0).getPriority());
+    }
+
+    @Test
     public void commandsAreLogged() {
 
         WorkflowBoard board = new WorkflowBoard();
